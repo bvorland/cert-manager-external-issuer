@@ -41,7 +41,7 @@ Open Azure Cloud Shell at [shell.azure.com](https://shell.azure.com) and run:
 
 ```bash
 # Clone the repository
-git clone https://github.com/example-org/cert-manager-external-issuer.git
+git clone https://github.com/bvorland/cert-manager-external-issuer.git
 cd cert-manager-external-issuer
 
 # Set your variables
@@ -73,7 +73,7 @@ Choose **Bash** as your shell type.
 
 ```bash
 # Clone the project
-git clone https://github.com/example-org/cert-manager-external-issuer.git
+git clone https://github.com/bvorland/cert-manager-external-issuer.git
 cd cert-manager-external-issuer
 ```
 

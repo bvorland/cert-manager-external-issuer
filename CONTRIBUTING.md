@@ -39,7 +39,7 @@ This project follows the [CNCF Code of Conduct](https://github.com/cncf/foundati
    ```
 3. Add the upstream remote:
    ```bash
-   git remote add upstream https://github.com/example-org/cert-manager-external-issuer.git
+   git remote add upstream https://github.com/bvorland/cert-manager-external-issuer.git
    ```
 
 ---

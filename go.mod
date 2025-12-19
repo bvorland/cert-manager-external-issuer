@@ -1,4 +1,4 @@
-module github.com/example-org/cert-manager-external-issuer
+module github.com/bvorland/cert-manager-external-issuer
 
 go 1.24.0
 

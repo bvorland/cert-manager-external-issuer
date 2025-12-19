@@ -4,9 +4,9 @@ import (
 	"flag"
 	"os"
 
+	externalissuerapi "github.com/bvorland/cert-manager-external-issuer/api/v1alpha1"
+	"github.com/bvorland/cert-manager-external-issuer/controllers"
 	cmapi "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
-	externalissuerapi "github.com/example-org/cert-manager-external-issuer/api/v1alpha1"
-	"github.com/example-org/cert-manager-external-issuer/controllers"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"

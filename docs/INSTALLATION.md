@@ -27,7 +27,7 @@ For quick testing without configuring a real PKI, use the built-in **MockCA** si
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/cert-manager-external-issuer.git
+git clone https://github.com/bvorland/cert-manager-external-issuer.git
 cd cert-manager-external-issuer
 
 # Deploy everything (CRDs, RBAC, controller)
@@ -68,7 +68,7 @@ Choose the installation method that best fits your environment:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/cert-manager-external-issuer.git
+git clone https://github.com/bvorland/cert-manager-external-issuer.git
 cd cert-manager-external-issuer
 
 # Set your variables
@@ -92,7 +92,7 @@ az acr build --registry $ACR_NAME --image external-issuer:latest .
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/cert-manager-external-issuer.git
+git clone https://github.com/bvorland/cert-manager-external-issuer.git
 cd cert-manager-external-issuer
 
 # Deploy everything
@@ -113,7 +113,7 @@ docker build -t your-registry.com/external-issuer:v1 .
 docker push your-registry.com/external-issuer:v1
 
 # Update the deployment with your image
-sed -i 's|ghcr.io/your-org/external-issuer:latest|your-registry.com/external-issuer:v1|g' deploy/deployment.yaml
+sed -i 's|bvorland/external-issuer:latest|your-registry.com/external-issuer:v1|g' deploy/deployment.yaml
 
 # Deploy
 kubectl apply -f deploy/
@@ -127,7 +127,7 @@ For Windows users deploying to AKS:
 
 ```powershell
 # Clone and deploy
-git clone https://github.com/your-org/cert-manager-external-issuer.git
+git clone https://github.com/bvorland/cert-manager-external-issuer.git
 cd cert-manager-external-issuer
 
 # Deploy to AKS with ACR
@@ -139,7 +139,7 @@ cd cert-manager-external-issuer
 ### Method 5: Helm Chart (Coming Soon)
 
 ```bash
-helm repo add external-issuer https://your-org.github.io/external-issuer
+helm repo add external-issuer https://bvorland.github.io/external-issuer
 helm install external-issuer external-issuer/external-issuer \
   --namespace external-issuer-system \
   --create-namespace

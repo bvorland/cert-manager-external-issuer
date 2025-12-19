@@ -173,7 +173,7 @@ helm install cert-manager jetstack/cert-manager \
 
 ```bash
 # Clone this repository
-git clone https://github.com/example-org/cert-manager-external-issuer.git
+git clone https://github.com/bvorland/cert-manager-external-issuer.git
 cd cert-manager-external-issuer
 
 # Deploy with Mock CA (for testing)
