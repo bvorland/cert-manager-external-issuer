@@ -1,0 +1,138 @@
+---
+# MockCA Server Deployment
+#
+# This deploys the standalone Mock CA server as a separate service.
+# The controller can then be configured to use this external Mock CA
+# instead of the built-in self-signing MockCA.
+#
+# Useful for:
+#   - Testing PKI API integration without a real PKI
+#   - Development environments
+#   - Demo purposes
+#
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mockca-system
+  labels:
+    app.kubernetes.io/name: mockca-server
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mockca-server
+  namespace: mockca-system
+  labels:
+    app.kubernetes.io/name: mockca-server
+    app.kubernetes.io/component: server
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mockca-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mockca-server
+        app.kubernetes.io/component: server
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mockca
+          image: mockca-server:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - --addr=:8080
+            - --log-level=info
+            - --log-format=json
+            - --ca-cn=Mock CA for Kubernetes
+            - --ca-org=cert-manager-external-issuer
+            - --cert-validity=90
+          env:
+            - name: MOCKCA_LOG_LEVEL
+              value: "info"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+      nodeSelector:
+        kubernetes.io/os: linux
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mockca-server
+  namespace: mockca-system
+  labels:
+    app.kubernetes.io/name: mockca-server
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: mockca-server
+---
+# ConfigMap for External Issuer to use the MockCA server
+# Copy this to external-issuer-system namespace if needed
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mockca-pki-config
+  namespace: mockca-system
+  labels:
+    app.kubernetes.io/name: mockca-server
+data:
+  pki-config.json: |
+    {
+      "baseUrl": "http://mockca-server.mockca-system.svc.cluster.local:8080/api/v1/sign",
+      "method": "POST",
+      "parameters": {
+        "subjectParam": "common_name",
+        "dnsPrefix": "dns_",
+        "dnsStartIndex": 1
+      },
+      "response": {
+        "format": "json",
+        "certificateField": "certificate",
+        "chainField": "certificate_chain"
+      }
+    }

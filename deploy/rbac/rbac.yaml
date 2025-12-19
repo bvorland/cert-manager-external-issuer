@@ -1,0 +1,114 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: external-issuer-system
+  labels:
+    app.kubernetes.io/name: external-issuer
+    app.kubernetes.io/component: controller
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: external-issuer-controller
+  namespace: external-issuer-system
+  labels:
+    app.kubernetes.io/name: external-issuer
+    app.kubernetes.io/component: controller
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: external-issuer-controller-role
+  labels:
+    app.kubernetes.io/name: external-issuer
+rules:
+  # CertificateRequest permissions - core functionality
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificaterequests"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificaterequests/status"]
+    verbs: ["get", "patch"]
+  
+  # Note: Approval is handled by cert-manager's internal approver.
+  # See deploy/rbac/approver-clusterrole.yaml for the approver RBAC.
+  # Alternatively, configure cert-manager Helm chart with:
+  #   --set approveSignerNames[0]="externalissuers.external-issuer.io/*"
+  #   --set approveSignerNames[1]="externalclusterissuers.external-issuer.io/*"
+  # See: https://cert-manager.io/docs/usage/certificaterequest/#approval
+  
+  # Our custom issuer types
+  - apiGroups: ["external-issuer.io"]
+    resources: ["externalissuers", "externalclusterissuers"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["external-issuer.io"]
+    resources: ["externalissuers/status", "externalclusterissuers/status"]
+    verbs: ["get", "update", "patch"]
+  
+  # ConfigMap for PKI configuration
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  
+  # Secrets for authentication credentials
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+  
+  # Events for observability
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  
+  # Leader election
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: external-issuer-controller-binding
+  labels:
+    app.kubernetes.io/name: external-issuer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: external-issuer-controller-role
+subjects:
+  - kind: ServiceAccount
+    name: external-issuer-controller
+    namespace: external-issuer-system
+---
+# Role for leader election in the controller namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: external-issuer-leader-election
+  namespace: external-issuer-system
+  labels:
+    app.kubernetes.io/name: external-issuer
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: external-issuer-leader-election
+  namespace: external-issuer-system
+  labels:
+    app.kubernetes.io/name: external-issuer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: external-issuer-leader-election
+subjects:
+  - kind: ServiceAccount
+    name: external-issuer-controller
+    namespace: external-issuer-system

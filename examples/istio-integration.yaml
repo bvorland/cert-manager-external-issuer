@@ -1,0 +1,131 @@
+# Example: Istio Gateway Integration
+#
+# This example shows how to use External Issuer certificates
+# with Istio ingress gateway for TLS termination.
+#
+
+---
+# Step 1: Create Certificate in istio-system namespace
+#
+# Istio ingress gateway reads TLS certificates from Secrets
+# in the istio-system namespace.
+#
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: istio-gateway-tls
+  namespace: istio-system
+spec:
+  secretName: istio-gateway-tls-secret
+  duration: 2160h      # 90 days
+  renewBefore: 720h    # 30 days
+  commonName: "*.apps.example.com"
+  dnsNames:
+    - "*.apps.example.com"
+    - "apps.example.com"
+  privateKey:
+    algorithm: RSA
+    size: 2048
+    rotationPolicy: Always
+  issuerRef:
+    name: mockca-cluster-issuer
+    kind: ExternalClusterIssuer
+    group: external-issuer.io
+
+---
+# Step 2: Create Istio Gateway using the certificate
+#
+# The Gateway references the Secret created by cert-manager
+# using the credentialName field.
+#
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: apps-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    # HTTPS server with TLS termination
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      tls:
+        mode: SIMPLE
+        # This references the cert-manager created Secret
+        credentialName: istio-gateway-tls-secret
+      hosts:
+        - "*.apps.example.com"
+    
+    # HTTP server with redirect to HTTPS
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      tls:
+        httpsRedirect: true
+      hosts:
+        - "*.apps.example.com"
+
+---
+# Step 3: Create VirtualService for an application
+#
+# Routes traffic from the Gateway to your application.
+#
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: my-app
+  namespace: my-app
+spec:
+  hosts:
+    - "my-app.apps.example.com"
+  gateways:
+    - istio-system/apps-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: my-app-service
+            port:
+              number: 80
+
+---
+# Step 4: (Optional) Service for your application
+#
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app-service
+  namespace: my-app
+spec:
+  selector:
+    app: my-app
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+
+---
+# Multiple VirtualServices can share the same Gateway
+#
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: another-app
+  namespace: another-app
+spec:
+  hosts:
+    - "another-app.apps.example.com"
+  gateways:
+    - istio-system/apps-gateway
+  http:
+    - route:
+        - destination:
+            host: another-app-service
+            port:
+              number: 80

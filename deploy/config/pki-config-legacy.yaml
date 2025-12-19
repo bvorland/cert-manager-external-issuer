@@ -1,0 +1,62 @@
+---
+# Legacy PKI Configuration ConfigMap (CGI-based PKI API)
+# This ConfigMap configures the external-issuer to connect to legacy PKI APIs
+# that use semicolon-separated parameters and slash-format DNs.
+#
+# Example PKI API format:
+#   POST https://pki.example.com/cgi/pki.cgi
+#   Body: new=1;subject=/C=US/ST=California/L=San Francisco/O=Example Corp/CN=example.com;DNS2=alt.com
+#   Response: Raw PEM certificate
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: external-issuer-config
+  namespace: external-issuer-system
+  labels:
+    app.kubernetes.io/name: external-issuer
+    app.kubernetes.io/component: config
+data:
+  # Use the external PKI signer for production
+  signer-type: "pki"
+  
+  # Legacy PKI API Configuration
+  # ---------------------------------------------------------
+  pki-config: |
+    {
+      "baseUrl": "https://pki.example.com/cgi/pki.cgi",
+      "method": "POST",
+      "parameters": {
+        "paramFormat": "semicolon",
+        "newCertParam": "new",
+        "newCertValue": "1",
+        "renewCertParam": "renew",
+        "renewCertValue": "1",
+        "subjectParam": "subject",
+        "subjectDNFormat": "slash",
+        "dnsPrefix": "DNS",
+        "dnsStartIndex": 2,
+        "dnsMaxCount": 20
+      },
+      "response": {
+        "format": "pem"
+      },
+      "tls": {
+        "insecureSkipVerify": false
+      }
+    }
+
+---
+# Example curl command to test the PKI API:
+#
+# New certificate:
+#   curl -s -X POST \
+#     -d "new=1;subject=/C=US/ST=California/L=San Francisco/O=Example Corp/CN=test.example.com;DNS2=test2.example.com" \
+#     https://pki.example.com/cgi/pki.cgi > test.example.com.pem
+#
+# Renew certificate:
+#   curl -s -X POST \
+#     -d "renew=1;subject=/C=US/ST=California/L=San Francisco/O=Example Corp/CN=test.example.com" \
+#     https://pki.example.com/cgi/pki.cgi > test.example.com.pem
+#
+# The MockCA server at /cgi/pki.cgi supports the same format for testing.

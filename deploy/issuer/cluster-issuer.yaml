@@ -1,0 +1,38 @@
+---
+# Example: ClusterIssuer using MockCA (for testing)
+#
+# This issuer uses the built-in Mock CA for generating certificates.
+# Use this for development, testing, and proof-of-concepts.
+#
+apiVersion: external-issuer.io/v1alpha1
+kind: ExternalClusterIssuer
+metadata:
+  name: mockca-cluster-issuer
+spec:
+  # Use the mock CA signer (no ConfigMap needed for mockca)
+  signerType: mockca
+---
+# Example: ClusterIssuer using real PKI API (for production)
+#
+# This issuer connects to your external PKI system.
+# Make sure to update the ConfigMap with your PKI API settings.
+#
+apiVersion: external-issuer.io/v1alpha1
+kind: ExternalClusterIssuer
+metadata:
+  name: pki-cluster-issuer
+spec:
+  # Reference to the PKI configuration ConfigMap
+  configMapRef:
+    name: external-issuer-config
+    namespace: external-issuer-system
+  
+  # Use the external PKI signer
+  signerType: pki
+  
+  # Optional: Name of a Secret containing PKI API credentials
+  # The Secret should contain keys like:
+  #   - api-token: Bearer token for API authentication
+  #   - username: Username for basic auth
+  #   - password: Password for basic auth
+  authSecretName: pki-api-credentials

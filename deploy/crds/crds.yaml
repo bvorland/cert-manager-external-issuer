@@ -1,0 +1,200 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: externalissuers.external-issuer.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+spec:
+  group: external-issuer.io
+  names:
+    kind: ExternalIssuer
+    listKind: ExternalIssuerList
+    plural: externalissuers
+    singular: externalissuer
+    shortNames:
+      - ei
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Ready
+          type: string
+          jsonPath: .status.conditions[?(@.type=='Ready')].status
+        - name: Reason
+          type: string
+          jsonPath: .status.conditions[?(@.type=='Ready')].reason
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: ExternalIssuer is a namespaced issuer for external PKI systems
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              description: ExternalIssuerSpec defines the desired state
+              properties:
+                url:
+                  type: string
+                  description: URL of the CA API (used with Mock CA)
+                configMapRef:
+                  type: object
+                  description: Reference to ConfigMap with PKI configuration
+                  required:
+                    - name
+                  properties:
+                    name:
+                      type: string
+                      description: Name of the ConfigMap
+                    namespace:
+                      type: string
+                      description: Namespace of the ConfigMap
+                    key:
+                      type: string
+                      description: Key in the ConfigMap (default pki-config.json)
+                      default: pki-config.json
+                authSecretName:
+                  type: string
+                  description: Name of Secret containing auth credentials
+                signerType:
+                  type: string
+                  description: Type of signer (mockca or pki)
+                  enum:
+                    - mockca
+                    - pki
+                  default: mockca
+            status:
+              type: object
+              description: ExternalIssuerStatus defines the observed state
+              properties:
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      observedGeneration:
+                        type: integer
+                        format: int64
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: externalclusterissuers.external-issuer.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+spec:
+  group: external-issuer.io
+  names:
+    kind: ExternalClusterIssuer
+    listKind: ExternalClusterIssuerList
+    plural: externalclusterissuers
+    singular: externalclusterissuer
+    shortNames:
+      - eci
+  scope: Cluster
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Ready
+          type: string
+          jsonPath: .status.conditions[?(@.type=='Ready')].status
+        - name: Reason
+          type: string
+          jsonPath: .status.conditions[?(@.type=='Ready')].reason
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: ExternalClusterIssuer is a cluster-wide issuer for external PKI systems
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              description: ExternalIssuerSpec defines the desired state
+              properties:
+                url:
+                  type: string
+                  description: URL of the CA API (used with Mock CA)
+                configMapRef:
+                  type: object
+                  description: Reference to ConfigMap with PKI configuration
+                  required:
+                    - name
+                  properties:
+                    name:
+                      type: string
+                      description: Name of the ConfigMap
+                    namespace:
+                      type: string
+                      description: Namespace of the ConfigMap (default external-issuer-system)
+                    key:
+                      type: string
+                      description: Key in the ConfigMap (default pki-config.json)
+                      default: pki-config.json
+                authSecretName:
+                  type: string
+                  description: Name of Secret containing auth credentials
+                signerType:
+                  type: string
+                  description: Type of signer (mockca or pki)
+                  enum:
+                    - mockca
+                    - pki
+                  default: mockca
+            status:
+              type: object
+              description: ExternalIssuerStatus defines the observed state
+              properties:
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      observedGeneration:
+                        type: integer
+                        format: int64

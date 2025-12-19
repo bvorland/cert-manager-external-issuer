@@ -1,0 +1,93 @@
+# Example: Basic Certificate with External Issuer
+#
+# This example shows how to create a simple TLS certificate
+# using the External Issuer with MockCA for testing.
+#
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: example-app-tls
+  namespace: default
+spec:
+  # The Secret where cert-manager will store the certificate
+  secretName: example-app-tls-secret
+  
+  # Certificate validity (90 days)
+  duration: 2160h
+  
+  # Renew 30 days before expiration
+  renewBefore: 720h
+  
+  # Certificate subject
+  commonName: example-app.example.com
+  
+  # Subject Alternative Names (SANs)
+  dnsNames:
+    - example-app.example.com
+    - www.example-app.example.com
+  
+  # Key configuration
+  privateKey:
+    algorithm: RSA
+    size: 2048
+    rotationPolicy: Always
+  
+  # Reference to External Issuer
+  issuerRef:
+    name: mockca-cluster-issuer
+    kind: ExternalClusterIssuer
+    group: external-issuer.io
+
+---
+# Example: Multi-domain certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: multi-domain-tls
+  namespace: default
+spec:
+  secretName: multi-domain-tls-secret
+  duration: 2160h
+  renewBefore: 720h
+  commonName: api.example.com
+  dnsNames:
+    - api.example.com
+    - admin.example.com
+    - portal.example.com
+    - "*.internal.example.com"
+  ipAddresses:
+    - "10.0.0.100"
+  issuerRef:
+    name: mockca-cluster-issuer
+    kind: ExternalClusterIssuer
+    group: external-issuer.io
+
+---
+# Example: Short-lived certificate for internal services
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: internal-service-tls
+  namespace: default
+spec:
+  secretName: internal-service-tls-secret
+  duration: 168h    # 7 days
+  renewBefore: 24h  # Renew 1 day before expiry
+  commonName: internal-service.default.svc.cluster.local
+  dnsNames:
+    - internal-service
+    - internal-service.default
+    - internal-service.default.svc
+    - internal-service.default.svc.cluster.local
+  usages:
+    - server auth
+    - client auth
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    name: mockca-cluster-issuer
+    kind: ExternalClusterIssuer
+    group: external-issuer.io

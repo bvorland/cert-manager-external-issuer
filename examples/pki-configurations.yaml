@@ -1,0 +1,292 @@
+# PKI API Configuration Examples
+#
+# This file contains ConfigMap examples for various PKI systems.
+# Copy the appropriate example and modify for your environment.
+#
+
+---
+# Example 1: HashiCorp Vault PKI
+#
+# Vault PKI Secrets Engine integration
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-pki-config
+  namespace: external-issuer-system
+data:
+  signer-type: "pki"
+  pki-api-url: "https://vault.example.com/v1/pki/sign/server-role"
+  pki-api-method: "POST"
+  pki-api-content-type: "application/json"
+  pki-request-template: |
+    {
+      "csr": "{{.CSR}}",
+      "common_name": "{{.CommonName}}",
+      "ttl": "{{.Duration}}",
+      "format": "pem"
+    }
+  pki-response-cert-path: ".data.certificate"
+  pki-response-ca-path: ".data.issuing_ca"
+  pki-timeout: "30"
+  pki-skip-tls-verify: "false"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-pki-credentials
+  namespace: external-issuer-system
+type: Opaque
+stringData:
+  api-token: "hvs.your-vault-token-here"
+
+---
+# Example 2: EJBCA REST API
+#
+# EJBCA Enterprise PKI integration
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ejbca-pki-config
+  namespace: external-issuer-system
+data:
+  signer-type: "pki"
+  pki-api-url: "https://ejbca.example.com/ejbca/rest/v1/certificate/enrollkeystore"
+  pki-api-method: "POST"
+  pki-api-content-type: "application/json"
+  pki-request-template: |
+    {
+      "certificate_request": "{{.CSR}}",
+      "certificate_profile_name": "ServerProfile",
+      "end_entity_profile_name": "ServerEndEntity",
+      "certificate_authority_name": "ManagementCA",
+      "username": "{{.CommonName}}",
+      "password": "generated"
+    }
+  pki-response-cert-path: ".certificate"
+  pki-response-ca-path: ".certificate_chain"
+  pki-timeout: "60"
+  pki-skip-tls-verify: "false"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ejbca-pki-credentials
+  namespace: external-issuer-system
+type: Opaque
+stringData:
+  # EJBCA uses client certificate authentication
+  client-cert: |
+    -----BEGIN CERTIFICATE-----
+    Your client certificate here
+    -----END CERTIFICATE-----
+  client-key: |
+    -----BEGIN PRIVATE KEY-----
+    Your client private key here
+    -----END PRIVATE KEY-----
+
+---
+# Example 3: Microsoft ADCS (Active Directory Certificate Services)
+#
+# Using ADCS NDES/CEP endpoint
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: adcs-pki-config
+  namespace: external-issuer-system
+data:
+  signer-type: "pki"
+  pki-api-url: "https://adcs.example.com/certsrv/certfnsh.asp"
+  pki-api-method: "POST"
+  pki-api-content-type: "application/x-www-form-urlencoded"
+  pki-request-template: |
+    Mode=newreq&CertRequest={{.CSR}}&CertAttrib=CertificateTemplate:WebServer&TargetStoreFlags=0&SaveCert=yes
+  pki-response-cert-path: ""
+  pki-response-ca-path: ""
+  pki-timeout: "60"
+  pki-skip-tls-verify: "false"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: adcs-pki-credentials
+  namespace: external-issuer-system
+type: Opaque
+stringData:
+  username: "DOMAIN\\service-account"
+  password: "your-password-here"
+
+---
+# Example 4: Venafi Trust Protection Platform
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: venafi-pki-config
+  namespace: external-issuer-system
+data:
+  signer-type: "pki"
+  pki-api-url: "https://venafi.example.com/vedsdk/certificates/request"
+  pki-api-method: "POST"
+  pki-api-content-type: "application/json"
+  pki-request-template: |
+    {
+      "PolicyDN": "\\VED\\Policy\\Kubernetes",
+      "PKCS10": "{{.CSR}}",
+      "ObjectName": "{{.CommonName}}",
+      "CertificateType": "Server"
+    }
+  pki-response-cert-path: ".CertificateData"
+  pki-response-ca-path: ".CAChain"
+  pki-timeout: "60"
+  pki-skip-tls-verify: "false"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: venafi-pki-credentials
+  namespace: external-issuer-system
+type: Opaque
+stringData:
+  api-token: "your-venafi-api-token"
+
+---
+# Example 5: AWS Private CA (via custom proxy)
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aws-pca-config
+  namespace: external-issuer-system
+data:
+  signer-type: "pki"
+  pki-api-url: "https://pca-proxy.example.com/sign"
+  pki-api-method: "POST"
+  pki-api-content-type: "application/json"
+  pki-request-template: |
+    {
+      "csr": "{{.CSR}}",
+      "validity_days": 90,
+      "certificate_authority_arn": "arn:aws:acm-pca:us-east-1:123456789:certificate-authority/abc-123"
+    }
+  pki-response-cert-path: ".Certificate"
+  pki-response-ca-path: ".CertificateChain"
+  pki-timeout: "30"
+  pki-skip-tls-verify: "false"
+
+---
+# Example 6: Google Cloud Private CA
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gcp-privateca-config
+  namespace: external-issuer-system
+data:
+  signer-type: "pki"
+  pki-api-url: "https://privateca.googleapis.com/v1/projects/my-project/locations/us-central1/caPools/my-pool/certificates"
+  pki-api-method: "POST"
+  pki-api-content-type: "application/json"
+  pki-request-template: |
+    {
+      "pemCsr": "{{.CSR}}",
+      "lifetime": "7776000s",
+      "certificateId": "cert-{{.CommonName}}"
+    }
+  pki-response-cert-path: ".pemCertificate"
+  pki-response-ca-path: ".pemCertificateChain"
+  pki-timeout: "30"
+  pki-skip-tls-verify: "false"
+
+---
+# Example 7: Simple REST API (generic)
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: simple-rest-config
+  namespace: external-issuer-system
+data:
+  signer-type: "pki"
+  pki-api-url: "https://pki-api.example.com/api/v1/sign"
+  pki-api-method: "POST"
+  pki-api-content-type: "application/json"
+  pki-request-template: |
+    {
+      "csr": "{{.CSR}}",
+      "subject": "{{.CommonName}}",
+      "validity_hours": 2160
+    }
+  pki-response-cert-path: ".certificate"
+  pki-response-ca-path: ".ca_chain"
+  pki-timeout: "30"
+  pki-skip-tls-verify: "false"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: simple-rest-credentials
+  namespace: external-issuer-system
+type: Opaque
+stringData:
+  api-token: "Bearer your-api-token-here"
+
+---
+# Example 8: MockCA for testing (default)
+#
+# Built-in mock CA - no external PKI required
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mockca-config
+  namespace: external-issuer-system
+data:
+  signer-type: "mockca"
+  mockca-cert-validity: "90d"
+  mockca-key-size: "2048"
+
+---
+# Example 9: Legacy CGI-based PKI API
+#
+# For legacy PKI systems that use semicolon-separated parameters
+# and slash-format DNs (e.g., /C=US/O=Example/CN=example.com)
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: legacy-pki-config
+  namespace: external-issuer-system
+data:
+  signer-type: "pki"
+  pki-config.json: |
+    {
+      "baseUrl": "https://pki.example.com/cgi/pki.cgi",
+      "method": "POST",
+      "parameters": {
+        "paramFormat": "semicolon",
+        "subjectDNFormat": "slash",
+        "newCertParam": "new",
+        "newCertValue": "1",
+        "renewCertParam": "renew",
+        "renewCertValue": "1",
+        "subjectParam": "subject",
+        "dnsPrefix": "DNS",
+        "dnsStartIndex": 2,
+        "dnsMaxCount": 20
+      },
+      "response": {
+        "format": "pem"
+      },
+      "tls": {
+        "insecureSkipVerify": false
+      }
+    }
+# 
+# This generates requests in the format:
+#   POST https://pki.example.com/cgi/pki.cgi
+#   new=1;subject=/C=US/ST=California/O=Example/CN=myapp.example.com;DNS2=alt.example.com
+#
+# Response: Raw PEM certificate

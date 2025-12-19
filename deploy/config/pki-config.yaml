@@ -1,0 +1,94 @@
+---
+# PKI Configuration ConfigMap
+# This ConfigMap defines how the external-issuer connects to your PKI API
+#
+# IMPORTANT: Update these values to match your PKI system!
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: external-issuer-config
+  namespace: external-issuer-system
+  labels:
+    app.kubernetes.io/name: external-issuer
+    app.kubernetes.io/component: config
+data:
+  # The type of signer to use
+  # Options:
+  #   - "pki"    : Connect to an external PKI API (production)
+  #   - "mockca" : Use built-in mock CA for testing
+  signer-type: "mockca"
+  
+  # PKI API Configuration (only used when signer-type=pki)
+  # ---------------------------------------------------------
+  
+  # The full URL of your PKI certificate signing endpoint
+  # Examples:
+  #   - https://pki.example.com/api/v1/certificate/sign
+  #   - https://vault.example.com/v1/pki/sign/server-role
+  #   - https://ejbca.example.com/ejbca/rest/v1/certificate/enrollkeystore
+  pki-api-url: "https://pki.example.com/api/v1/certificate/sign"
+  
+  # HTTP method for the PKI API
+  # Most PKI APIs use POST for certificate signing
+  pki-api-method: "POST"
+  
+  # Content-Type header for requests
+  # Options:
+  #   - "application/json" (most modern APIs)
+  #   - "application/x-www-form-urlencoded" (legacy APIs)
+  #   - "application/pkcs10" (raw CSR APIs)
+  pki-api-content-type: "application/json"
+  
+  # Request body template
+  # Use Go template syntax with these available variables:
+  #   - {{.CSR}}        : Base64-encoded CSR (PEM format)
+  #   - {{.CommonName}} : Certificate Common Name
+  #   - {{.Duration}}   : Requested certificate duration
+  #
+  # Examples:
+  #
+  # JSON API:
+  #   {"csr": "{{.CSR}}", "common_name": "{{.CommonName}}", "ttl": "{{.Duration}}"}
+  #
+  # Form-encoded API:
+  #   csr={{.CSR}}&profile=server&common_name={{.CommonName}}
+  #
+  # HashiCorp Vault:
+  #   {"csr": "{{.CSR}}", "common_name": "{{.CommonName}}", "ttl": "{{.Duration}}", "format": "pem"}
+  pki-request-template: '{"csr": "{{.CSR}}", "common_name": "{{.CommonName}}", "ttl": "{{.Duration}}"}'
+  
+  # JSONPath expression to extract the signed certificate from the response
+  # Uses dot notation to navigate the JSON response
+  # Examples:
+  #   - ".certificate"                    (simple response)
+  #   - ".data.certificate"               (HashiCorp Vault)
+  #   - ".response.certificates[0].cert"  (complex response)
+  pki-response-cert-path: ".certificate"
+  
+  # JSONPath expression to extract the CA certificate chain (optional)
+  # If not provided, the CA chain may be included in the certificate field
+  pki-response-ca-path: ".ca_chain"
+  
+  # Request timeout in seconds
+  pki-timeout: "30"
+  
+  # Whether to skip TLS verification (NOT recommended for production)
+  # Set to "true" only for testing with self-signed PKI certificates
+  pki-skip-tls-verify: "false"
+  
+  # MockCA Configuration (only used when signer-type=mockca)
+  # ---------------------------------------------------------
+  # The MockCA is useful for:
+  #   - Development and testing
+  #   - Demos and proof-of-concepts
+  #   - Environments without PKI access
+  #
+  # Note: MockCA generates certificates signed by a local CA.
+  #       These are NOT trusted by browsers/clients by default.
+  
+  # Mock CA certificate validity period
+  mockca-cert-validity: "90d"
+  
+  # Mock CA key size (RSA)
+  mockca-key-size: "2048"

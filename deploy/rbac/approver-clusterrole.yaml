@@ -1,0 +1,52 @@
+# This ClusterRole grants the cert-manager internal approver permission to approve
+# CertificateRequests that reference our external issuer types.
+#
+# This is the recommended approach for external issuers:
+# - Follows the sample-external-issuer pattern from cert-manager
+# - Leverages cert-manager's built-in approver controller
+# - No need for the external issuer to self-approve
+#
+# Alternative: Configure cert-manager via Helm to approve our issuer types:
+#   --set approveSignerNames[0]="externalissuers.external-issuer.io/*"
+#   --set approveSignerNames[1]="externalclusterissuers.external-issuer.io/*"
+#
+# See: https://cert-manager.io/docs/usage/certificaterequest/#approval
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cert-manager-controller-approve:external-issuer-io
+  labels:
+    app.kubernetes.io/name: external-issuer
+    app.kubernetes.io/component: approver
+rules:
+  # Permission to approve CertificateRequests that reference our issuer types
+  # RBAC Syntax: <signer-resource-name>.<signer-group>/*
+  - apiGroups: ["cert-manager.io"]
+    resources: ["signers"]
+    verbs: ["approve"]
+    resourceNames:
+      # Approve all ExternalIssuers in all namespaces
+      - "externalissuers.external-issuer.io/*"
+      # Approve all ExternalClusterIssuers
+      - "externalclusterissuers.external-issuer.io/*"
+---
+# Bind the approver ClusterRole to cert-manager's service account
+# This allows cert-manager's internal approver to auto-approve our CertificateRequests
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cert-manager-controller-approve:external-issuer-io
+  labels:
+    app.kubernetes.io/name: external-issuer
+    app.kubernetes.io/component: approver
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cert-manager-controller-approve:external-issuer-io
+subjects:
+  # The cert-manager controller service account
+  # Adjust namespace if cert-manager is installed elsewhere (e.g., plat-system)
+  - kind: ServiceAccount
+    name: cert-manager
+    namespace: cert-manager
