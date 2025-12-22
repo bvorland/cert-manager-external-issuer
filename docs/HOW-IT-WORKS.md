@@ -19,91 +19,54 @@ This document provides a detailed technical explanation of how the External PKI 
 
 When you install the External PKI Issuer, the following components are created:
 
-```plaintext
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           AKS Cluster                                        │
-│                                                                              │
-│  Namespace: external-issuer-system                                          │
-│  ┌────────────────────────────────────────────────────────────────────────┐ │
-│  │                                                                         │ │
-│  │  ┌──────────────────┐  ┌──────────────────┐  ┌────────────────────┐   │ │
-│  │  │   Deployment     │  │    ConfigMap     │  │      Secret        │   │ │
-│  │  │   controller     │  │    pki-config    │  │      pki-auth      │   │ │
-│  │  │                  │  │                  │  │                    │   │ │
-│  │  │  • 2 replicas    │  │  • PKI API URL   │  │  • API token       │   │ │
-│  │  │  • Leader elect  │  │  • HTTP method   │  │  • Client cert     │   │ │
-│  │  │  • Health probes │  │  • Parameters    │  │  • Password        │   │ │
-│  │  └────────┬─────────┘  └────────┬─────────┘  └──────────┬─────────┘   │ │
-│  │           │                     │                       │              │ │
-│  │           └─────────────────────┴───────────────────────┘              │ │
-│  │                                 │                                       │ │
-│  │                                 ▼                                       │ │
-│  │           ┌───────────────────────────────────────────┐                │ │
-│  │           │          ServiceAccount                   │                │ │
-│  │           │          external-issuer-controller       │                │ │
-│  │           └───────────────────────────────────────────┘                │ │
-│  │                                 │                                       │ │
-│  └─────────────────────────────────┼───────────────────────────────────────┘ │
-│                                    │                                         │
-│  Cluster-Scoped Resources          ▼                                         │
-│  ┌────────────────────────────────────────────────────────────────────────┐ │
-│  │  ┌──────────────────────┐  ┌────────────────────────────────────────┐  │ │
-│  │  │     ClusterRole      │  │     ClusterRoleBinding                 │  │ │
-│  │  │                      │  │                                        │  │ │
-│  │  │  • certificaterequests│  │  Binds ClusterRole to ServiceAccount │  │ │
-│  │  │  • clusterissuers    │  │                                        │  │ │
-│  │  │  • secrets           │  │                                        │  │ │
-│  │  │  • configmaps        │  │                                        │  │ │
-│  │  └──────────────────────┘  └────────────────────────────────────────┘  │ │
-│  │                                                                         │ │
-│  │  ┌──────────────────────────────────────────────────────────────────┐  │ │
-│  │  │              Custom Resource Definitions (CRDs)                   │  │ │
-│  │  │                                                                   │  │ │
-│  │  │  • externalissuers.external-issuer.io (namespaced)               │  │ │
-│  │  │  • externalclusterissuers.external-issuer.io (cluster-scoped)    │  │ │
-│  │  └──────────────────────────────────────────────────────────────────┘  │ │
-│  └─────────────────────────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph cluster["AKS Cluster"]
+        subgraph ns["Namespace: external-issuer-system"]
+            deploy["🚀 Deployment<br/><b>controller</b><br/>• 2 replicas<br/>• Leader elect<br/>• Health probes"]
+            config["📄 ConfigMap<br/><b>pki-config</b><br/>• PKI API URL<br/>• HTTP method<br/>• Parameters"]
+            secret["🔐 Secret<br/><b>pki-auth</b><br/>• API token<br/>• Client cert<br/>• Password"]
+            sa["👤 ServiceAccount<br/><b>external-issuer-controller</b>"]
+            
+            deploy --> sa
+            config --> deploy
+            secret --> deploy
+        end
+        
+        subgraph cluster_scoped["Cluster-Scoped Resources"]
+            cr["🔒 ClusterRole<br/>• certificaterequests<br/>• clusterissuers<br/>• secrets<br/>• configmaps"]
+            crb["🔗 ClusterRoleBinding<br/>Binds ClusterRole to ServiceAccount"]
+            
+            subgraph crds["Custom Resource Definitions (CRDs)"]
+                ei["externalissuers.external-issuer.io<br/>(namespaced)"]
+                eci["externalclusterissuers.external-issuer.io<br/>(cluster-scoped)"]
+            end
+        end
+        
+        sa --> crb
+        crb --> cr
+    end
 ```
 
 ### How Components Interact
 
-```plaintext
-User Request                    cert-manager                External Issuer
-     │                              │                            │
-     │  1. Create Certificate       │                            │
-     │─────────────────────────────▶│                            │
-     │                              │                            │
-     │                              │  2. Generate private key   │
-     │                              │     Create CSR             │
-     │                              │     Create CertificateRequest
-     │                              │────────────────────────────▶
-     │                              │                            │
-     │                              │                            │  3. Watch event
-     │                              │                            │     received
-     │                              │                            │
-     │                              │                            │  4. Validate issuer
-     │                              │                            │     Load PKI config
-     │                              │                            │
-     │                              │                            │  5. Call external
-     │                              │                            │     PKI API
-     │                              │                            │        │
-     │                              │                            │        ▼
-     │                              │                            │   ┌─────────┐
-     │                              │                            │   │ PKI API │
-     │                              │                            │   └────┬────┘
-     │                              │                            │        │
-     │                              │                            │◀───────┘
-     │                              │                            │  Signed cert
-     │                              │                            │
-     │                              │  6. Update CertificateRequest
-     │                              │◀────────────────────────────
-     │                              │     status.certificate = PEM
-     │                              │                            │
-     │                              │  7. Create/Update Secret   │
-     │                              │                            │
-     │  8. Secret ready             │                            │
-     │◀─────────────────────────────│                            │
+```mermaid
+sequenceDiagram
+    participant User
+    participant CM as cert-manager
+    participant EI as External Issuer
+    participant PKI as PKI API
+    
+    User->>CM: 1. Create Certificate
+    CM->>CM: 2. Generate private key & CSR
+    CM->>EI: 3. Create CertificateRequest
+    Note over EI: 4. Watch event received
+    EI->>EI: 5. Validate issuer & load config
+    EI->>PKI: 6. Call external PKI API
+    PKI-->>EI: 7. Return signed certificate
+    EI->>CM: 8. Update CertificateRequest status
+    CM->>CM: 9. Create/Update Secret
+    CM-->>User: 10. Secret ready
 ```
 
 ---
@@ -217,18 +180,22 @@ data:
 
 cert-manager monitors the certificate expiration:
 
-```plaintext
-Timeline:
-├── Day 0: Certificate issued (90-day validity)
-│
-├── Day 75: renewBefore threshold (15 days before expiry)
-│           cert-manager creates new CertificateRequest
-│           External Issuer signs new certificate
-│           Secret updated with new certificate
-│           Private key optionally rotated
-│
-└── Day 90: Original certificate would expire
-            (but was already renewed on Day 75)
+```mermaid
+timeline
+    title Certificate Renewal Timeline
+    section Validity Period
+        Day 0 : Certificate issued (90-day validity)
+    section Active Period
+        Day 1-74 : Certificate valid and in use
+    section Renewal Window
+        Day 75 : renewBefore threshold reached (15 days before expiry)
+               : cert-manager creates new CertificateRequest
+               : External Issuer signs new certificate
+               : Secret updated with new certificate
+               : Private key optionally rotated
+    section Expiry
+        Day 90 : Original certificate would expire
+               : (but was already renewed on Day 75)
 ```
 
 ---
@@ -352,16 +319,15 @@ rules:
 
 The controller establishes persistent watches on the Kubernetes API:
 
-```plaintext
-┌────────────────────┐         Watch Connection          ┌─────────────────┐
-│                    │◀──────────────────────────────────│                 │
-│  Kubernetes API    │                                   │    Controller   │
-│     Server         │  Event: CertificateRequest added  │                 │
-│                    │──────────────────────────────────▶│   Reconcile()   │
-│                    │                                   │                 │
-│                    │  PATCH: Update CR status          │                 │
-│                    │◀──────────────────────────────────│                 │
-└────────────────────┘                                   └─────────────────┘
+```mermaid
+sequenceDiagram
+    participant API as Kubernetes API Server
+    participant Ctrl as Controller
+    
+    Ctrl->>API: Establish Watch Connection
+    API-->>Ctrl: Event: CertificateRequest added
+    Ctrl->>Ctrl: Reconcile()
+    Ctrl->>API: PATCH: Update CR status
 ```
 
 ---
@@ -370,67 +336,29 @@ The controller establishes persistent watches on the Kubernetes API:
 
 ### Step-by-Step Signing Process
 
-```plaintext
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                          External Issuer Controller                           │
-│                                                                               │
-│  1. Receive CertificateRequest with CSR                                      │
-│     ┌──────────────────────────────────────────────────────────────────────┐ │
-│     │  -----BEGIN CERTIFICATE REQUEST-----                                 │ │
-│     │  MIICvDCCAaQCAQAwdzELMAkGA1UEBhMCVVMxDTALBgNVBAgMBFRlc3Q...         │ │
-│     │  -----END CERTIFICATE REQUEST-----                                   │ │
-│     └──────────────────────────────────────────────────────────────────────┘ │
-│                                    │                                          │
-│                                    ▼                                          │
-│  2. Parse CSR to extract subject and SANs                                    │
-│     ┌──────────────────────────────────────────────────────────────────────┐ │
-│     │  Subject: CN=my-app.example.com, O=MyOrg                             │ │
-│     │  DNS SANs: my-app.example.com, www.my-app.example.com                │ │
-│     │  Key Usage: digitalSignature, keyEncipherment                        │ │
-│     └──────────────────────────────────────────────────────────────────────┘ │
-│                                    │                                          │
-│                                    ▼                                          │
-│  3. Build HTTP request based on ConfigMap                                    │
-│     ┌──────────────────────────────────────────────────────────────────────┐ │
-│     │  POST https://pki.example.com/api/sign                               │ │
-│     │  Authorization: Bearer <token-from-secret>                           │ │
-│     │  Content-Type: application/x-www-form-urlencoded                     │ │
-│     │                                                                       │ │
-│     │  action=new&subject=CN=my-app.example.com,O=MyOrg&                   │ │
-│     │  san_dns1=my-app.example.com&san_dns2=www.my-app.example.com         │ │
-│     └──────────────────────────────────────────────────────────────────────┘ │
-│                                    │                                          │
-│                                    ▼                                          │
-└────────────────────────────────────┼──────────────────────────────────────────┘
-                                     │
-                    ┌────────────────┴────────────────┐
-                    │       Network (HTTPS)           │
-                    │   (May go through Azure FW)     │
-                    └────────────────┬────────────────┘
-                                     │
-                                     ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                         External PKI API                                      │
-│                                                                               │
-│  4. PKI validates request and signs certificate                              │
-│     - Checks authorization                                                   │
-│     - Validates subject against policy                                       │
-│     - Signs certificate with CA private key                                  │
-│     - Returns certificate chain                                              │
-│                                                                               │
-│  5. Response                                                                 │
-│     ┌──────────────────────────────────────────────────────────────────────┐ │
-│     │  -----BEGIN CERTIFICATE-----                                         │ │
-│     │  MIID... (leaf certificate)                                          │ │
-│     │  -----END CERTIFICATE-----                                           │ │
-│     │  -----BEGIN CERTIFICATE-----                                         │ │
-│     │  MIIE... (intermediate CA)                                           │ │
-│     │  -----END CERTIFICATE-----                                           │ │
-│     │  -----BEGIN CERTIFICATE-----                                         │ │
-│     │  MIIF... (root CA)                                                   │ │
-│     │  -----END CERTIFICATE-----                                           │ │
-│     └──────────────────────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph controller["External Issuer Controller"]
+        step1["1️⃣ Receive CertificateRequest<br/>with CSR (PEM encoded)"]
+        step2["2️⃣ Parse CSR<br/>Subject: CN=my-app.example.com<br/>DNS SANs: my-app.example.com, www.my-app.example.com<br/>Key Usage: digitalSignature, keyEncipherment"]
+        step3["3️⃣ Build HTTP Request<br/>POST https://pki.example.com/api/sign<br/>Authorization: Bearer token<br/>Content-Type: application/x-www-form-urlencoded"]
+        
+        step1 --> step2
+        step2 --> step3
+    end
+    
+    network["🌐 Network (HTTPS)<br/>May go through Azure FW"]
+    
+    subgraph pki["External PKI API"]
+        step4["4️⃣ PKI validates & signs<br/>• Checks authorization<br/>• Validates subject against policy<br/>• Signs certificate with CA private key"]
+        step5["5️⃣ Returns certificate chain<br/>• Leaf certificate<br/>• Intermediate CA<br/>• Root CA"]
+        
+        step4 --> step5
+    end
+    
+    step3 --> network
+    network --> step4
+    step5 --> controller
 ```
 
 ---
@@ -439,54 +367,32 @@ The controller establishes persistent watches on the Kubernetes API:
 
 When used with Istio service mesh, the certificates enable TLS at the ingress gateway:
 
-```plaintext
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              AKS Cluster                                     │
-│                                                                              │
-│   External Traffic                                                           │
-│        │                                                                     │
-│        ▼                                                                     │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                    Azure Load Balancer                               │   │
-│   │                    (Internal or External)                            │   │
-│   └────────────────────────────┬────────────────────────────────────────┘   │
-│                                │                                             │
-│                                ▼                                             │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                   Istio Ingress Gateway                              │   │
-│   │                                                                      │   │
-│   │   Gateway resource:                                                  │   │
-│   │   ┌───────────────────────────────────────────────────────────────┐ │   │
-│   │   │ spec:                                                          │ │   │
-│   │   │   servers:                                                     │ │   │
-│   │   │   - port: 443                                                  │ │   │
-│   │   │     tls:                                                       │ │   │
-│   │   │       mode: SIMPLE                                             │ │   │
-│   │   │       credentialName: my-app-tls  ◀─── References Secret      │ │   │
-│   │   └───────────────────────────────────────────────────────────────┘ │   │
-│   │                                                                      │   │
-│   │   Istio reads Secret using SDS (Secret Discovery Service)           │   │
-│   │   ┌──────────────────────────────────────────────────────────────┐  │   │
-│   │   │  Secret: my-app-tls (namespace: istio-system)                │  │   │
-│   │   │  - tls.crt: (certificate from External Issuer)               │  │   │
-│   │   │  - tls.key: (private key from cert-manager)                  │  │   │
-│   │   │  - ca.crt: (CA chain from External Issuer)                   │  │   │
-│   │   └──────────────────────────────────────────────────────────────┘  │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│                                │                                             │
-│                                │ TLS Terminated                              │
-│                                │ mTLS to backend                             │
-│                                ▼                                             │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                      Application Pod                                 │   │
-│   │   ┌───────────────────┐  ┌───────────────────────────────────────┐  │   │
-│   │   │   Istio Sidecar   │  │         Application Container         │  │   │
-│   │   │   (Envoy Proxy)   │◀─┤                                       │  │   │
-│   │   │                   │  │                                       │  │   │
-│   │   │   Handles mTLS    │  │                                       │  │   │
-│   │   └───────────────────┘  └───────────────────────────────────────┘  │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    client["👤 External Client"]
+    
+    subgraph cluster["AKS Cluster"]
+        lb["⚖️ Azure Load Balancer<br/>(Internal or External)"]
+        
+        subgraph istio["Istio Ingress Gateway"]
+            gw["🌐 Gateway Resource<br/>spec.servers[0].tls.mode: SIMPLE<br/>credentialName: my-app-tls"]
+            envoy["🔷 Envoy Proxy<br/>TLS Termination"]
+        end
+        
+        secret["🔐 Secret: my-app-tls<br/>(istio-system namespace)<br/>• tls.crt: certificate from External Issuer<br/>• tls.key: private key from cert-manager<br/>• ca.crt: CA chain from External Issuer"]
+        
+        subgraph app["Application Pod"]
+            sidecar["🔷 Istio Sidecar<br/>(Envoy - handles mTLS)"]
+            container["📦 Application Container"]
+        end
+    end
+    
+    client -->|"HTTPS (443)"| lb
+    lb --> envoy
+    secret -.->|"SDS reads certs"| envoy
+    gw --> envoy
+    envoy -->|"HTTP (internal) / mTLS"| sidecar
+    sidecar --> container
 ```
 
 ### Istio Certificate Flow
@@ -499,15 +405,17 @@ When used with Istio service mesh, the certificates enable TLS at the ingress ga
 
 ### Zero-Downtime Renewal
 
-```plaintext
-Timeline:
-├── T+0:    New certificate issued, Secret updated
-├── T+100ms: Istio pilot detects Secret change
-├── T+200ms: Pilot pushes new config to Envoy via xDS
-├── T+300ms: Envoy applies new certificate
-│            (existing connections continue with old cert)
-│            (new connections use new cert)
-└── T+5min:  All connections now using new certificate
+```mermaid
+timeline
+    title Zero-Downtime Certificate Renewal
+    section Certificate Update
+        T+0 : New certificate issued, Secret updated
+        T+100ms : Istio pilot detects Secret change
+        T+200ms : Pilot pushes new config to Envoy via xDS
+        T+300ms : Envoy applies new certificate
+                : Existing connections continue with old cert
+                : New connections use new cert
+        T+5min : All connections now using new certificate
 ```
 
 ---

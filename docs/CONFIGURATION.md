@@ -12,32 +12,18 @@ The External Issuer uses a **ConfigMap** to store PKI API connection details. Th
 
 ## Configuration Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                   external-issuer-system namespace              │
-│                                                                  │
-│   ┌─────────────────────┐      ┌─────────────────────────────┐  │
-│   │   ConfigMap         │      │   Secret                    │  │
-│   │   pki-config        │      │   pki-auth                  │  │
-│   │                     │      │                             │  │
-│   │ • PKI API URL       │      │ • API Token                 │  │
-│   │ • HTTP Method       │      │ • Client Certificate        │  │
-│   │ • Request Format    │      │ • Password                  │  │
-│   │ • Response Parsing  │      │                             │  │
-│   └──────────┬──────────┘      └──────────────┬──────────────┘  │
-│              │                                │                  │
-│              └────────────────┬───────────────┘                  │
-│                               │                                  │
-│                               ▼                                  │
-│              ┌─────────────────────────────────┐                │
-│              │   ExternalClusterIssuer         │                │
-│              │                                 │                │
-│              │ spec:                           │                │
-│              │   configMapRef:                 │                │
-│              │     name: pki-config            │                │
-│              │   authSecretName: pki-auth      │                │
-│              └─────────────────────────────────┘                │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph ns["external-issuer-system namespace"]
+        direction TB
+        
+        configmap["📄 ConfigMap<br/><b>pki-config</b><br/>• PKI API URL<br/>• HTTP Method<br/>• Request Format<br/>• Response Parsing"]
+        secret["🔐 Secret<br/><b>pki-auth</b><br/>• API Token<br/>• Client Certificate<br/>• Password"]
+        issuer["🏷️ ExternalClusterIssuer<br/><br/>spec:<br/>  configMapRef:<br/>    name: pki-config<br/>  authSecretName: pki-auth"]
+        
+        configmap --> issuer
+        secret --> issuer
+    end
 ```
 
 ## PKI Configuration ConfigMap
