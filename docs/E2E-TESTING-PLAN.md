@@ -320,45 +320,6 @@ kubectl wait --for=condition=Available deployment/cert-manager-webhook -n cert-m
 
 ---
 
-## Notes for Other Team's Error
-
-The error mentioned in the request is related to **Let's Encrypt ACME issuer with Azure DNS**, not this External Issuer. The key issues are:
-
-1. **Missing `clientID`**: The ACME ClusterIssuer requires Azure DNS credentials:
-   ```yaml
-   spec:
-     acme:
-       solvers:
-       - dns01:
-           azureDNS:
-             clientID: "<azure-app-registration-client-id>"  # REQUIRED
-             clientSecretSecretRef:
-               name: azure-dns-secret
-               key: client-secret
-             subscriptionID: "<subscription-id>"
-             tenantID: "<tenant-id>"
-             resourceGroupName: "<dns-zone-resource-group>"
-             hostedZoneName: "<your-domain.com>"
-   ```
-
-2. **Alternative: Managed Identity** (if using AKS with managed identity):
-   ```yaml
-   spec:
-     acme:
-       solvers:
-       - dns01:
-           azureDNS:
-             managedIdentity:
-               clientID: "<managed-identity-client-id>"
-             subscriptionID: "<subscription-id>"
-             resourceGroupName: "<dns-zone-resource-group>"
-             hostedZoneName: "<your-domain.com>"
-   ```
-
-See the separate troubleshooting document for Let's Encrypt Azure DNS configuration.
-
----
-
 ## Quick Reference Commands
 
 ```powershell
